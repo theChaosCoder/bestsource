@@ -740,7 +740,13 @@ BestAudioFrame *BestAudioSource::SeekAndDecode(int64_t N, int64_t SeekFrame, std
                 BSDebugPrint("Seek destination determined to be within 100 frames of start, this was unexpected", N, MatchedN);
 #endif
 
-            Decoder->SetFrameNumber(MatchedN + MatchFrames.size(), TrackIndex.Frames[MatchedN + MatchFrames.size()].Start);
+            int64_t NextFrame = MatchedN + MatchFrames.size();
+            // The matched run can end exactly at the last frame, so the next frame is one past
+            // the end; its sample position is then the total sample count of the track.
+            int64_t NextSample = (NextFrame < static_cast<int64_t>(TrackIndex.Frames.size()))
+                ? TrackIndex.Frames[NextFrame].Start
+                : TrackIndex.Frames.back().Start + TrackIndex.Frames.back().Length;
+            Decoder->SetFrameNumber(NextFrame, NextSample);
 
             // Insert frames into cache if appropriate
             BestAudioFrame *RetFrame = nullptr;
