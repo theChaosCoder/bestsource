@@ -507,7 +507,7 @@ double BestAudioSource::GetRelativeStartTime(int Track) const {
         std::unique_ptr<LWVideoDecoder> Dec(new LWVideoDecoder(Source, "", 0, Track, 0, 0, LAVFOptions));
         AVFrame *F = Dec->GetNextFrame();
         int64_t PTS = (F && F->pts != AV_NOPTS_VALUE) ? F->pts : 0;
-        av_frame_unref(F);
+        av_frame_free(&F);
         LWVideoProperties VP;
         Dec->GetVideoProperties(VP);
         return AP.StartTime - (static_cast<double>(VP.TimeBase.Num) * PTS) / VP.TimeBase.Den;
