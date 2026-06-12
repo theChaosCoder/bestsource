@@ -292,9 +292,9 @@ static std::array<uint8_t, HashSize> GetHash(const AVFrame *Frame) {
     if (IsPlanar) {
         int NumPlanes = Frame->ch_layout.nb_channels;
         for (int p = 0; p < NumPlanes; p++)
-            XXH3_64bits_update(hctx, Frame->extended_data[p], BytesPerSample * Frame->nb_samples);
+            XXH3_64bits_update(hctx, Frame->extended_data[p], static_cast<size_t>(BytesPerSample) * Frame->nb_samples);
     } else {
-        XXH3_64bits_update(hctx, Frame->data[0], BytesPerSample * Frame->ch_layout.nb_channels * Frame->nb_samples);
+        XXH3_64bits_update(hctx, Frame->data[0], static_cast<size_t>(BytesPerSample) * Frame->ch_layout.nb_channels * Frame->nb_samples);
     }
 
     XXH64_hash_t FinalHash = XXH3_64bits_digest(hctx);
