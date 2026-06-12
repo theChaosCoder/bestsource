@@ -505,6 +505,12 @@ bool LWVideoDecoder::HasSeeked() const {
 }
 
 void BSVideoFormat::Set(const AVPixFmtDescriptor *Desc) {
+    // av_pix_fmt_desc_get() returns nullptr for an out-of-range format value, which can
+    // come from a corrupt index file; leave the format zeroed rather than dereferencing it.
+    if (!Desc) {
+        *this = BSVideoFormat{};
+        return;
+    }
     Alpha = HasAlpha(Desc);
     Float = GetSampleTypeIsFloat(Desc);
     ColorFamily = GetColorFamily(Desc);
