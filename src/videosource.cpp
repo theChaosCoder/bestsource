@@ -1515,22 +1515,43 @@ BestVideoFrame *BestVideoSource::GetFrameLinearInternal(int64_t N, int64_t SeekF
 bool BestVideoSource::InitializeRFF() {
     assert(RFFState == RFFStateEnum::Uninitialized);
 
+    // RFFFields is indexed by display frame within the currently selected format set, so it
+    // must only be built from the frames belonging to that set and store set-relative frame
+    // numbers (GetFrameWithRFF feeds them back through GetFrame, which remaps per set). When no
+    // specific set is selected this skips nothing, matching GetOriginalFrameNumber().
+    const bool UseSet = (VariableFormat >= 0 && FormatSets.size() > 1);
+    int ActiveFormat = 0, ActiveWidth = 0, ActiveHeight = 0;
+    if (UseSet) {
+        ActiveFormat = FormatSets[VariableFormat].Format;
+        ActiveWidth = FormatSets[VariableFormat].Width;
+        ActiveHeight = FormatSets[VariableFormat].Height;
+    }
+
+    const int64_t FieldFrames = VP.NumRFFFrames;
     int64_t DestFieldTop = 0;
     int64_t DestFieldBottom = 0;
-    RFFFields.resize(VP.NumRFFFrames);
+    RFFFields.resize(FieldFrames);
 
     int64_t N = 0;
     for (auto &Iter : TrackIndex.Frames) {
+        if (UseSet && (Iter.Format != ActiveFormat || Iter.Width != ActiveWidth || Iter.Height != ActiveHeight))
+            continue;
+
         int RepeatFields = Iter.RepeatPict + 2;
 
         bool DestTop = Iter.TFF;
         for (int i = 0; i < RepeatFields; i++) {
+            // Non-conforming streams (and a corrupt index) can break the assumed top/bottom field
+            // alternation and drive these counters past FieldFrames; the bounds checks keep the
+            // writes in range while preserving the original behaviour for well-formed streams.
             if (DestTop) {
-                assert(DestFieldTop <= DestFieldBottom);
-                RFFFields[DestFieldTop++].first = N;
+                if (DestFieldTop < FieldFrames)
+                    RFFFields[DestFieldTop].first = N;
+                DestFieldTop++;
             } else {
-                assert(DestFieldTop >= DestFieldBottom);
-                RFFFields[DestFieldBottom++].second = N;
+                if (DestFieldBottom < FieldFrames)
+                    RFFFields[DestFieldBottom].second = N;
+                DestFieldBottom++;
             }
             DestTop = !DestTop;
         }
@@ -1538,15 +1559,14 @@ bool BestVideoSource::InitializeRFF() {
     }
 
     if (DestFieldTop > DestFieldBottom) {
-        RFFFields[DestFieldBottom].second = RFFFields[DestFieldBottom - 1].second;
+        if (DestFieldBottom > 0 && DestFieldBottom < FieldFrames)
+            RFFFields[DestFieldBottom].second = RFFFields[DestFieldBottom - 1].second;
         DestFieldBottom++;
     } else if (DestFieldTop < DestFieldBottom) {
-        RFFFields[DestFieldTop].first = RFFFields[DestFieldTop - 1].first;
+        if (DestFieldTop > 0 && DestFieldTop < FieldFrames)
+            RFFFields[DestFieldTop].first = RFFFields[DestFieldTop - 1].first;
         DestFieldTop++;
     }
-
-    assert(DestFieldTop == DestFieldBottom);
-    assert(DestFieldTop == VP.NumRFFFrames);
 
     RFFState = RFFStateEnum::Ready;
 
