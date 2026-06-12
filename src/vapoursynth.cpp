@@ -78,7 +78,8 @@ static const VSFrame *VS_CC BestVideoSourceGetFrame(int n, int ActivationReason,
                 throw BestSourceException("No frame returned for frame number " + std::to_string(n) + ". This may be due to an FFmpeg bug. Retry with threads=1 if not already set.");
 
             VSVideoFormat VideoFormat = {};
-            vsapi->queryVideoFormat(&VideoFormat, Src->VF.ColorFamily, Src->VF.Float ? stFloat : stInteger, Src->VF.Bits, Src->VF.SubSamplingW, Src->VF.SubSamplingH, Core);
+            if (!vsapi->queryVideoFormat(&VideoFormat, Src->VF.ColorFamily, Src->VF.Float ? stFloat : stInteger, Src->VF.Bits, Src->VF.SubSamplingW, Src->VF.SubSamplingH, Core))
+                throw BestSourceException("Frame " + std::to_string(n) + " has a pixel format that cannot be represented in VapourSynth");
             VSVideoFormat AlphaFormat = {};
             vsapi->queryVideoFormat(&AlphaFormat, cfGray, VideoFormat.sampleType, VideoFormat.bitsPerSample, 0, 0, Core);
 
