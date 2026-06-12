@@ -1662,7 +1662,7 @@ BestVideoFrame *BestVideoSource::GetFrameByTime(double Time, bool Linear) {
     size_t Frame = std::distance(TrackIndex.Frames.begin(), Pos);
     if (Pos == TrackIndex.Frames.begin() || std::abs(Pos->PTS - PTS) <= std::abs((Pos - 1)->PTS - PTS))
         return GetFrame(Frame, Linear);
-    return GetFrame(Frame - 1);
+    return GetFrame(Frame - 1, Linear);
 }
 
 const std::vector<BestVideoSource::FormatSet> &BestVideoSource::GetFormatSets() const {
