@@ -92,6 +92,8 @@ int BestTrackList::GetNumTracks() const {
 }
 
 const BestTrackList::TrackInfo &BestTrackList::GetTrackInfo(int Track) const {
+    if (Track < 0 || Track >= static_cast<int>(TrackList.size()))
+        throw BestSourceException("Invalid track number");
     return TrackList[Track];
 }
 
