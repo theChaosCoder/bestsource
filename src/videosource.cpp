@@ -1618,6 +1618,8 @@ void BestVideoSource::InitializeFormatSets() {
 }
 
 BestVideoFrame *BestVideoSource::GetFrameWithRFF(int64_t N, bool Linear) {
+    if (N < 0 || N >= VP.NumRFFFrames)
+        return nullptr;
     if (RFFState == RFFStateEnum::Uninitialized)
         InitializeRFF();
     if (RFFState == RFFStateEnum::Unused) {
