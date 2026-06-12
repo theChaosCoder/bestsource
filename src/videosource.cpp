@@ -1539,6 +1539,8 @@ bool BestVideoSource::InitializeRFF() {
     assert(DestFieldTop == DestFieldBottom);
     assert(DestFieldTop == VP.NumRFFFrames);
 
+    RFFState = RFFStateEnum::Ready;
+
     return true;
 }
 
