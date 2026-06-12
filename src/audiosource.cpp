@@ -424,6 +424,9 @@ void BestAudioSource::SetSeekPreRoll(int64_t Frames) {
 bool BestAudioSource::IndexTrack(const ProgressFunction &Progress) {
     std::unique_ptr<LWAudioDecoder> Decoder(new LWAudioDecoder(Source, AudioTrack, Threads, LAVFOptions, DrcScale));
 
+    // A failed/partial index read may have left stale frames behind; start clean.
+    TrackIndex.Frames.clear();
+
     int64_t FileSize = Progress ? Decoder->GetSourceSize() : -1;
 
     int64_t NumSamples = 0;
@@ -1226,6 +1229,8 @@ bool BestAudioSource::ReadAudioTrackIndex(bool AbsolutePath, const std::filesyst
         return false;
 
     int LAVFOptCount = ReadInt(F);
+    if (LAVFOptCount < 0 || LAVFOptCount > 4096)
+        return false;
     std::map<std::string, std::string> IndexLAVFOptions;
     for (int i = 0; i < LAVFOptCount; i++) {
         std::string Key = ReadString(F);
@@ -1234,11 +1239,17 @@ bool BestAudioSource::ReadAudioTrackIndex(bool AbsolutePath, const std::filesyst
     if (LAVFOptions != IndexLAVFOptions)
         return false;
     int64_t NumFrames = ReadInt64(F);
+    if (NumFrames <= 0)
+        return false;
 
-    TrackIndex.Frames.reserve(NumFrames);
+    // Cap the reservation: NumFrames is untrusted, the loop below is bounded by the
+    // file contents anyway (the per-frame hash read fails once the data runs out).
+    TrackIndex.Frames.reserve(std::min<int64_t>(NumFrames, 1 << 16));
     AP.NumSamples = 0;
 
     int DictSize = ReadInt(F);
+    if (DictSize > 0xFF)
+        return false;
 
     if (DictSize > 0) {
         int64_t LastPTSValue = ReadInt64(F);
@@ -1256,7 +1267,10 @@ bool BestAudioSource::ReadAudioTrackIndex(bool AbsolutePath, const std::filesyst
         }
 
         for (int i = 0; i < NumFrames; i++) {
-            FrameInfo FI = Dict.at(ReadByte(F));
+            auto DictIt = Dict.find(ReadByte(F));
+            if (DictIt == Dict.end())
+                return false;
+            FrameInfo FI = DictIt->second;
             if (FI.PTS != AV_NOPTS_VALUE) {
                 FI.PTS += LastPTSValue;
                 LastPTSValue = FI.PTS;

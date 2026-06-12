@@ -234,6 +234,10 @@ double ReadDouble(file_ptr_t &F) {
 
 std::string ReadString(file_ptr_t &F) {
     int Size = ReadInt(F);
+    // A negative size (also the -1 sentinel on a short read) or an absurdly large
+    // one indicates a corrupt index; resize() would otherwise throw or allocate wildly.
+    if (Size < 0 || Size > (1 << 20))
+        return "";
     std::string S;
     S.resize(Size);
     if (static_cast<int>(fread(&S[0], 1, Size, F.get())) == Size)
