@@ -1799,9 +1799,24 @@ bool BestVideoSource::ReadVideoTrackIndex(bool AbsolutePath, const std::filesyst
         return false;
     int64_t NumFrames = ReadInt64(F);
     TrackIndex.LastFrameDuration = ReadInt64(F);
-    TrackIndex.Frames.reserve(NumFrames);
+    // A valid index always has at least one frame; ReadInt64() also returns -1 on a
+    // truncated read. Reject non-positive counts so the constructor never reads
+    // TrackIndex.Frames[0] out of bounds and reserve() is never called with a negative
+    // (length_error) value. Guard the reserve too in case of an implausibly large count.
+    if (NumFrames <= 0)
+        return false;
+    try {
+        TrackIndex.Frames.reserve(NumFrames);
+    } catch (...) {
+        return false;
+    }
 
     int DictSize = ReadInt(F);
+
+    // The writer stores at most 0xFF dictionary entries (keys fit in a uint8_t), or 0 for
+    // the non-dictionary layout. Anything else means a corrupt index.
+    if (DictSize < 0 || DictSize > 0xFF)
+        return false;
 
     if (DictSize > 0) {
         int64_t LastPTSValue = ReadInt64(F);
@@ -1819,8 +1834,11 @@ bool BestVideoSource::ReadVideoTrackIndex(bool AbsolutePath, const std::filesyst
             Dict[i] = FI;
         }
 
-        for (int i = 0; i < NumFrames; i++) {
-            FrameInfo FI = Dict.at(ReadByte(F));
+        for (int64_t i = 0; i < NumFrames; i++) {
+            auto DictIter = Dict.find(ReadByte(F));
+            if (DictIter == Dict.end())
+                return false;
+            FrameInfo FI = DictIter->second;
             if (FI.PTS != AV_NOPTS_VALUE) {
                 FI.PTS += LastPTSValue;
                 LastPTSValue = FI.PTS;
@@ -1830,7 +1848,7 @@ bool BestVideoSource::ReadVideoTrackIndex(bool AbsolutePath, const std::filesyst
             TrackIndex.Frames.push_back(FI);
         }
     } else {
-        for (int i = 0; i < NumFrames; i++) {
+        for (int64_t i = 0; i < NumFrames; i++) {
             FrameInfo FI = {};
             if (fread(FI.Hash.data(), 1, FI.Hash.size(), F.get()) != FI.Hash.size())
                 return false;
