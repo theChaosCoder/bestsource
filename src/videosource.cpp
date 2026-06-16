@@ -516,6 +516,8 @@ void BSVideoFormat::Set(const AVPixFmtDescriptor *Desc) {
 BestVideoFrame::BestVideoFrame(AVFrame *F) {
     assert(F);
     Frame = av_frame_clone(F);
+    if (!Frame)
+        throw BestSourceException("Failed to clone video frame");
     auto Desc = av_pix_fmt_desc_get(static_cast<AVPixelFormat>(Frame->format));
     VF.Set(Desc);
     PTS = Frame->pts;

@@ -265,6 +265,8 @@ void BSAudioFormat::Set(int Format, int BitsPerRawSample) {
 BestAudioFrame::BestAudioFrame(AVFrame *F, int BitsPerSample) {
     assert(F);
     Frame = av_frame_clone(F);
+    if (!Frame)
+        throw BestSourceException("Failed to clone audio frame");
 
     AF.Set(F->format, BitsPerSample);
     NumChannels = F->ch_layout.nb_channels;
