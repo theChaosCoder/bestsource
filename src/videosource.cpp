@@ -1508,7 +1508,12 @@ bool BestVideoSource::InitializeRFF() {
 
     int64_t DestFieldTop = 0;
     int64_t DestFieldBottom = 0;
-    RFFFields.resize(VP.NumRFFFrames);
+    // RFFFields is filled by iterating over *all* frames in the track (the global
+    // timeline), so it must be sized for the global RFF field-pair count. Using the
+    // currently selected format set's (smaller) VP.NumRFFFrames caused an out of
+    // bounds heap write when a non-default format set was selected on a
+    // variable-format file with RFF flags.
+    RFFFields.resize(DefaultFormatSet.NumRFFFrames);
 
     int64_t N = 0;
     for (auto &Iter : TrackIndex.Frames) {
@@ -1537,7 +1542,7 @@ bool BestVideoSource::InitializeRFF() {
     }
 
     assert(DestFieldTop == DestFieldBottom);
-    assert(DestFieldTop == VP.NumRFFFrames);
+    assert(DestFieldTop == DefaultFormatSet.NumRFFFrames);
 
     RFFState = RFFStateEnum::Ready;
 
