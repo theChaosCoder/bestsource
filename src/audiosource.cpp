@@ -1243,10 +1243,23 @@ bool BestAudioSource::ReadAudioTrackIndex(bool AbsolutePath, const std::filesyst
         return false;
     int64_t NumFrames = ReadInt64(F);
 
-    TrackIndex.Frames.reserve(NumFrames);
+    // A valid index always has at least one frame; ReadInt64() also returns -1 on a
+    // truncated read. Reject non-positive counts so InitializeFormatSets() never reads
+    // FormatSets[0] out of bounds and reserve() is never called with a negative value.
+    if (NumFrames <= 0)
+        return false;
+    try {
+        TrackIndex.Frames.reserve(NumFrames);
+    } catch (...) {
+        return false;
+    }
     AP.NumSamples = 0;
 
     int DictSize = ReadInt(F);
+
+    // The writer stores at most 0xFF dictionary entries, or 0 for the non-dictionary layout.
+    if (DictSize < 0 || DictSize > 0xFF)
+        return false;
 
     if (DictSize > 0) {
         int64_t LastPTSValue = ReadInt64(F);
@@ -1260,11 +1273,19 @@ bool BestAudioSource::ReadAudioTrackIndex(bool AbsolutePath, const std::filesyst
             FI.SampleRate = ReadInt(F);
             FI.Channels = ReadInt(F);
             FI.ChannelLayout = ReadInt64(F);
+            // Corrupt non-positive Channels/SampleRate/Length feed negative byte-length
+            // math (Length * BytesPerSample * Channels) into the zero-fill memset paths,
+            // producing an out of bounds write. Reject implausible values up front.
+            if (FI.Length <= 0 || FI.Format < 0 || FI.BitsPerSample <= 0 || FI.SampleRate <= 0 || FI.Channels <= 0)
+                return false;
             Dict[i] = FI;
         }
 
-        for (int i = 0; i < NumFrames; i++) {
-            FrameInfo FI = Dict.at(ReadByte(F));
+        for (int64_t i = 0; i < NumFrames; i++) {
+            auto DictIter = Dict.find(ReadByte(F));
+            if (DictIter == Dict.end())
+                return false;
+            FrameInfo FI = DictIter->second;
             if (FI.PTS != AV_NOPTS_VALUE) {
                 FI.PTS += LastPTSValue;
                 LastPTSValue = FI.PTS;
@@ -1276,7 +1297,7 @@ bool BestAudioSource::ReadAudioTrackIndex(bool AbsolutePath, const std::filesyst
             TrackIndex.Frames.push_back(FI);
         }
     } else {
-        for (int i = 0; i < NumFrames; i++) {
+        for (int64_t i = 0; i < NumFrames; i++) {
             FrameInfo FI = {};
             if (fread(FI.Hash.data(), 1, FI.Hash.size(), F.get()) != FI.Hash.size())
                 return false;
@@ -1288,6 +1309,8 @@ bool BestAudioSource::ReadAudioTrackIndex(bool AbsolutePath, const std::filesyst
             FI.SampleRate = ReadInt(F);
             FI.Channels = ReadInt(F);
             FI.ChannelLayout = ReadInt64(F);
+            if (FI.Length <= 0 || FI.Format < 0 || FI.BitsPerSample <= 0 || FI.SampleRate <= 0 || FI.Channels <= 0)
+                return false;
             AP.NumSamples += FI.Length;
             TrackIndex.Frames.push_back(FI);
         }
