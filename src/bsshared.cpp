@@ -234,9 +234,19 @@ double ReadDouble(file_ptr_t &F) {
 
 std::string ReadString(file_ptr_t &F) {
     int Size = ReadInt(F);
+    // ReadInt() returns -1 on a short/failed read, and a corrupt index can supply any
+    // value, so never resize() with an unchecked size (negative -> length_error,
+    // huge -> bad_alloc). Treat anything non-positive as an empty string and guard the
+    // allocation so a corrupt cache file degrades to "discard and reindex".
+    if (Size <= 0)
+        return "";
     std::string S;
-    S.resize(Size);
-    if (static_cast<int>(fread(&S[0], 1, Size, F.get())) == Size)
+    try {
+        S.resize(Size);
+    } catch (...) {
+        return "";
+    }
+    if (fread(&S[0], 1, Size, F.get()) == static_cast<size_t>(Size))
         return S;
     else
         return "";
