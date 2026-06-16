@@ -1880,7 +1880,10 @@ bool BestVideoSource::GetFrameIsTFF(int64_t N, bool RFF) {
         InitializeRFF();
 
     if (!RFF || RFFState == RFFStateEnum::Unused) {
-        return TrackIndex.Frames[N].TFF;
+        // N is in the selected format set's frame space; map it back to the physical
+        // track index the same way GetFrame()/GetFrameInfo() do, otherwise a non-default
+        // format set returns the TFF flag of the wrong frame.
+        return TrackIndex.Frames[GetOriginalFrameNumber(N)].TFF;
     } else {
         if (RFFFields[N].first == RFFFields[N].second)
             return TrackIndex.Frames[RFFFields[N].first].TFF;
