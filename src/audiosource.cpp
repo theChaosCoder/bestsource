@@ -1048,6 +1048,12 @@ bool BestAudioSource::FillInFramePlanar(const BestAudioFrame *Frame, int64_t Fra
 
 void BestAudioSource::GetPackedAudio(uint8_t *Data, int64_t Start, int64_t Count) {
     // FIXME, relax the restriction to only requiring the same format within the range if anyone complains
+    // GetFrameRangeBySamples() and the fill helpers operate on the global sample timeline
+    // (TrackIndex.Frames[].Start), while a selected format set makes AP.NumSamples/NumFrames
+    // per-set totals. Mixing the two coordinate spaces produces wrong sample ranges or a
+    // spurious "failed to provide all samples" error, so reject the inconsistent case.
+    if (VariableFormat >= 0 && FormatSets.size() > 1)
+        throw BestSourceException("GetPackedAudio() can only be used when variable format is disabled (file has multiple audio format sets)");
     if (AP.Format == 0 || AP.BitsPerSample == 0 || AP.Channels == 0 || AP.ChannelLayout == 0 || AP.SampleRate == 0)
         throw BestSourceException("GetPackedAudio() can only be used when variable format is disabled");
 
@@ -1078,6 +1084,10 @@ void BestAudioSource::GetPackedAudio(uint8_t *Data, int64_t Start, int64_t Count
 }
 
 void BestAudioSource::GetPlanarAudio(uint8_t *const *const Data, int64_t Start, int64_t Count) {
+    // See GetPackedAudio(): the sample/frame coordinate spaces are inconsistent when a
+    // specific format set is selected on a file that has more than one audio format set.
+    if (VariableFormat >= 0 && FormatSets.size() > 1)
+        throw BestSourceException("GetPlanarAudio() can only be used when variable format is disabled (file has multiple audio format sets)");
     if (AP.Format == 0 || AP.BitsPerSample == 0 || AP.Channels == 0 || AP.ChannelLayout == 0 || AP.SampleRate == 0)
         throw BestSourceException("GetPlanarAudio() can only be used when variable format is disabled");
 
