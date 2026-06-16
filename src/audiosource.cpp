@@ -289,6 +289,8 @@ static std::array<uint8_t, HashSize> GetHash(const AVFrame *Frame) {
     int BytesPerSample = av_get_bytes_per_sample(static_cast<AVSampleFormat>(Frame->format));
 
     XXH3_state_t *hctx = XXH3_createState();
+    if (!hctx)
+        throw BestSourceException("Failed to allocate hash state");
     XXH3_64bits_reset(hctx);
 
     if (IsPlanar) {

@@ -840,6 +840,8 @@ static std::array<uint8_t, HashSize> GetHash(const AVFrame *Frame) {
     }
 
     XXH3_state_t *hctx = XXH3_createState();
+    if (!hctx)
+        throw BestSourceException("Failed to allocate hash state");
     XXH3_64bits_reset(hctx);
 
     for (int p = 0; p < NumPlanes; p++) {
