@@ -56,11 +56,19 @@ void BestTrackList::OpenFile(const std::filesystem::path &SourceFile, const std:
         int Disposition = FormatContext->streams[i]->disposition;
         TI.Disposition = Disposition;
 
-        while (const char *DispPart = av_disposition_to_string(Disposition)) {
+        // av_disposition_to_string() only maps a single disposition flag; passing the
+        // full mask returns NULL whenever more than one bit is set, so the string used
+        // to be empty for any stream with multiple disposition flags. Convert one bit at
+        // a time instead.
+        while (Disposition) {
+            int LowBit = Disposition & -Disposition;
+            Disposition &= Disposition - 1;
+            const char *DispPart = av_disposition_to_string(LowBit);
+            if (!DispPart)
+                continue;
             if (!TI.DispositionString.empty())
                 TI.DispositionString += ", ";
             TI.DispositionString += DispPart;
-            Disposition = Disposition & (Disposition - 1);
         }
 
         TrackList.push_back(TI);
