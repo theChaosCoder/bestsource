@@ -1141,11 +1141,11 @@ bool BestVideoSource::IndexTrack(const ProgressFunction &Progress) {
 
     if (!HasValidPTS) {
         // Probably H264 in AVI
-        if (VP.Duration == TrackIndex.Frames.size()) {
+        if (VP.Duration == static_cast<int64_t>(TrackIndex.Frames.size())) {
             // It's CFR so we know every frame duration is 1 unit
             for (size_t i = 0; i < TrackIndex.Frames.size(); i++)
                 TrackIndex.Frames[i].PTS = i;
-        } else if (VP.Duration == TrackIndex.Frames.size() * 2) {
+        } else if (VP.Duration == static_cast<int64_t>(TrackIndex.Frames.size()) * 2) {
             // It's with 99.99% certainty CFR so we almost know every frame duration is 2 units
             for (size_t i = 0; i < TrackIndex.Frames.size(); i++)
                 TrackIndex.Frames[i].PTS = i * 2;
