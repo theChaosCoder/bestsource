@@ -204,7 +204,14 @@ void LWAudioDecoder::GetAudioProperties(LWAudioProperties &AP) {
     AP.FileStartTime = FormatContext->start_time;
     AP.FileTimeBase = AV_TIME_BASE_Q;
 
-    AP.NumSamples = (FormatContext->duration * CodecContext->sample_rate) / AV_TIME_BASE - FormatContext->streams[TrackNumber]->codecpar->initial_padding;
+    // FormatContext->duration is AV_NOPTS_VALUE (INT64_MIN) for many pipe/streaming
+    // inputs; multiplying that by the sample rate is signed overflow (UB). This is only
+    // a pre-index estimate (it is replaced by the exact count after indexing), so fall
+    // back to 0 when the duration is unknown.
+    if (FormatContext->duration > 0)
+        AP.NumSamples = (FormatContext->duration * CodecContext->sample_rate) / AV_TIME_BASE - FormatContext->streams[TrackNumber]->codecpar->initial_padding;
+    else
+        AP.NumSamples = 0;
 }
 
 AVFrame *LWAudioDecoder::GetNextFrame(int *BitsPerSample) {
